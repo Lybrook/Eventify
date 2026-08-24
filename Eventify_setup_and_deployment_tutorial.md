@@ -204,7 +204,7 @@ cp .env.example .env.local
 Edit `eventify-frontend/.env.local`:
 
 ```dotenv
-NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+NEXT_PUBLIC_API_URL=https://eventify-x749.onrender.com/api/v1
 ```
 
 Only public frontend configuration belongs in this file. Do not add `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, `DJANGO_SECRET_KEY`, or Daraja secrets to the frontend environment.
@@ -282,7 +282,7 @@ Set or confirm these values in the `eventify-api` service. Replace every placeho
 |---|---|
 | `DJANGO_SECRET_KEY` | Use the generated value created by the Blueprint, or replace it with a long random secret. |
 | `DJANGO_DEBUG` | `false`. |
-| `DJANGO_ALLOWED_HOSTS` | `eventify-api.onrender.com` plus any custom API domain, comma separated. |
+| `DJANGO_ALLOWED_HOSTS` | `eventify-x749.onrender.com` plus any custom API domain, comma separated. |
 | `DATABASE_URL` | Your Supabase PostgreSQL connection string with the real password. |
 | `SUPABASE_URL` | `https://igyoafdermvrjxsciqoa.supabase.co`. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase server-only service-role key. |
@@ -295,7 +295,7 @@ Set or confirm these values in the `eventify-api` service. Replace every placeho
 | `MPESA_CONSUMER_SECRET` | Daraja sandbox consumer secret. |
 | `MPESA_SHORTCODE` | `174379` for the Daraja sandbox setup, unless your account requires another value. |
 | `MPESA_PASSKEY` | Daraja sandbox passkey. |
-| `MPESA_CALLBACK_URL` | `https://eventify-api.onrender.com/api/v1/payments/mpesa/callback/`, or your custom API domain equivalent. |
+| `MPESA_CALLBACK_URL` | `https://eventify-x749.onrender.com/api/v1/payments/mpesa/callback/`, or your custom API domain equivalent. |
 | `MPESA_ACCOUNT_REFERENCE` | `Eventify`. |
 | `MPESA_TRANSACTION_DESCRIPTION` | `Eventify ticket payment`. |
 | `JWT_ACCESS_MINUTES` | `30`. |
@@ -304,7 +304,7 @@ Set or confirm these values in the `eventify-api` service. Replace every placeho
 After the first deployment, open:
 
 ```text
-https://eventify-api.onrender.com/api/v1/health/
+https://eventify-x749.onrender.com/api/v1/health/
 ```
 
 A successful response confirms that Render can start Django. If Render reports a database connection error, verify the Supabase password, URL-encode special characters, and consider switching from the direct connection to the appropriate Supavisor session connection.
@@ -335,7 +335,7 @@ Vercel supports importing an existing Next.js repository from a Git provider and
 7. Add the production environment variable:
 
 ```dotenv
-NEXT_PUBLIC_API_URL=https://eventify-api.onrender.com/api/v1
+NEXT_PUBLIC_API_URL=https://eventify-x749.onrender.com/api/v1
 ```
 
 8. Deploy the project.

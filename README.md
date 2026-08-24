@@ -46,7 +46,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-The frontend is available at `http://localhost:3000`. Set `NEXT_PUBLIC_API_URL` to the Django API base, for example `http://localhost:8000/api/v1` locally or the Render API URL in Vercel.
+The frontend is available at `http://localhost:3000`. The repository default points to `https://eventify-x749.onrender.com/api/v1`; set `NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1` in `.env.local` when you want the frontend to use a local Django API instead.
 
 ## Supabase setup
 
@@ -95,7 +95,7 @@ Create the Blueprint from the repository and provide the `sync: false` values in
 Create a Vercel project with the repository root set to `eventify-frontend`. Vercel will detect Next.js automatically. Set:
 
 ```text
-NEXT_PUBLIC_API_URL=https://eventify-api.onrender.com/api/v1
+NEXT_PUBLIC_API_URL=https://eventify-x749.onrender.com/api/v1
 ```
 
 After the Vercel domain is known, add it to the Django `CORS_ALLOWED_ORIGINS` environment variable on Render. The frontend includes `vercel.json` as a minimal configuration reference.

@@ -10,7 +10,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-The default local API base is `http://localhost:8000/api/v1`.
+The committed default API base is `https://eventify-x749.onrender.com/api/v1`. To run the Django API locally instead, create `.env.local` with `NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1`; environment variables override the committed fallback.
 
 ## Routes
 

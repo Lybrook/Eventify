@@ -7,7 +7,7 @@ import type {
   User,
 } from "@/types";
 
-export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1").replace(/\/$/, "");
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://eventify-x749.onrender.com/api/v1").replace(/\/$/, "");
 
 const ACCESS_TOKEN_KEY = "eventify_access_token";
 const REFRESH_TOKEN_KEY = "eventify_refresh_token";
