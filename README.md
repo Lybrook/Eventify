@@ -2,6 +2,10 @@
 
 Eventify is an event discovery and ticketing platform for Kenya. The repository now contains a Next.js App Router frontend and a Django REST Framework API backed by Supabase PostgreSQL and Supabase Storage. The frontend is intended for Vercel, while the API can be deployed to Render through the included backend Blueprint.
 
+## Start here
+
+For the complete local setup and production deployment sequence, read [`Eventify_setup_and_deployment_tutorial.md`](./Eventify_setup_and_deployment_tutorial.md). It covers Supabase, Django, Render, Vercel, environment variables, M-Pesa sandbox testing, and post-deployment verification.
+
 ## Architecture
 
 | Layer | Technology | Location |
