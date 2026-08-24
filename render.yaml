@@ -8,7 +8,7 @@ services:
     buildCommand: pip install -r eventify-backend/requirements.txt && python eventify-backend/manage.py collectstatic --noinput && python eventify-backend/manage.py migrate
     startCommand: gunicorn --chdir eventify-backend eventify_api.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
     healthCheckPath: /api/v1/health/
-    autoDeploy: true
+    autoDeployTrigger: commit
     envVars:
       - key: DJANGO_SECRET_KEY
         generateValue: true
