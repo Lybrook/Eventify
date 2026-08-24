@@ -1,1 +1,24 @@
-node_modules
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Next.js
+.next/
+out/
+node_modules/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+
+# Django
+media/
+staticfiles/
+
+# Local tooling
+coverage/
+.pytest_cache/
+.DS_Store

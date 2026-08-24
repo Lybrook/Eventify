@@ -1,73 +1,32 @@
-# Eventify Frontend 🎟️  
+# Eventify Web
 
-This is the **frontend** of **Eventify**, an event management and ticketing platform built using **React.js**. It provides a seamless user experience for browsing, creating, and managing events.  
+The Eventify web application is built with Next.js App Router, TypeScript, React, and Tailwind CSS. It is designed for Vercel deployment and communicates with the Django API through `NEXT_PUBLIC_API_URL`.
 
-## 🚀 Features  
-✅ **Sign-In Page** – User authentication interface  
-✅ **Home Page** – Displays featured & upcoming events  
-✅ **Events Page** – Browse and explore events  
-✅ **About Us Page** – Learn more about Eventify  
+## Local development
 
-## 🛠 Tech Stack  
-- **React.js** – UI framework  
-- **React Router** – Page navigation  
-- **Axios** – API requests  
-- **CSS** – Styling (in `App.css`)  
-
-## 🏗 Getting Started  
-
-### 1. Clone the Repository  
 ```bash
- git clone https://github.com/IrineCKimeto/GROUP-5.git
+npm install
+cp .env.example .env.local
+npm run dev
 ```
 
-### 2. Navigate to the Frontend Folder  
-```bash
- cd eventify-frontend
-```
+The default local API base is `http://localhost:8000/api/v1`.
 
-### 3. Install Dependencies  
-```bash
- npm install
-```
+## Routes
 
-### 4. Start the Development Server  
-```bash
- npm start
-```
+| Route | Purpose |
+|---|---|
+| `/` | Editorial landing page and product introduction. |
+| `/events` | Search, filter, view, and plan event bookings. |
+| `/signin` | Registration and SimpleJWT login. |
+| `/tickets` | Authenticated ticket wallet and payment status. |
+| `/profile` | Profile, password, and account settings. |
+| `/admin/events` | Administrator event CRUD with image upload. |
+| `/about` | Product mission and operating principles. |
+| `/support` | Contact methods and persisted support requests. |
 
-## 📁 Project Structure  
-```
- eventify-frontend/
- ├── 📂 src/
- │   ├── 📂 components/    # Reusable UI components (e.g., Navbar)
- │   ├── 📂 pages/         # App pages (SignIn, Home, Events, AboutUs)
- │   ├── App.js           # Main component
- │   ├── index.js         # Entry point
- │   ├── App.css          # Global styles
- ├── 📂 public/           # Static assets
- ├── package.json        # Project dependencies
- ├── README.md           # Project documentation
-```
+## Deployment
 
-## 🤝 Contributing  
-### Create a new branch  
-```bash
- git checkout -b ft-branch-name
-```
-### Make your changes and commit  
-```bash
- git commit -m "Commit message"
-```
-### Push to GitHub  
-```bash
- git push origin ft-branch-name
-```
+Create a Vercel project with the project root set to `eventify-frontend`. Set `NEXT_PUBLIC_API_URL` to the deployed Django API base, such as `https://eventify-api.onrender.com/api/v1`. Add the final Vercel domain to the backend’s `CORS_ALLOWED_ORIGINS` environment variable.
 
-## 📧 Contact  
-For any questions or contributions, contact:  
-✉️ Muhsin Ali - muhsin.ali@student.moringaschool.com  
-✉️ Ian Masonik - ian.masonik@student.moringaschool.com  
-✉️ Irene Kimeto - irene.kimeto@student.moringaschool.com  
-✉️ Andrew Karanja - andrew.karanja@student.moringaschool.com  
-✉️ Lybrook Omondi - lybrook.omondi@student.moringaschool.com
+Event images are rendered from Supabase Storage URLs returned by Django. The frontend never receives or stores the Supabase service-role key.

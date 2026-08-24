@@ -1,0 +1,48 @@
+services:
+  - type: web
+    name: eventify-api
+    runtime: python
+    region: frankfurt
+    plan: free
+    rootDir: .
+    buildCommand: pip install -r eventify-backend/requirements.txt && python eventify-backend/manage.py collectstatic --noinput && python eventify-backend/manage.py migrate
+    startCommand: gunicorn --chdir eventify-backend eventify_api.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    healthCheckPath: /api/v1/health/
+    autoDeploy: true
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: DJANGO_ALLOWED_HOSTS
+        value: "eventify-api.onrender.com"
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        value: "https://igyoafdermvrjxsciqoa.supabase.co"
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: "event-images"
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false
+      - key: SECURE_SSL_REDIRECT
+        value: "true"
+      - key: MPESA_ENVIRONMENT
+        value: "sandbox"
+      - key: MPESA_CONSUMER_KEY
+        sync: false
+      - key: MPESA_CONSUMER_SECRET
+        sync: false
+      - key: MPESA_SHORTCODE
+        value: "174379"
+      - key: MPESA_PASSKEY
+        sync: false
+      - key: MPESA_CALLBACK_URL
+        value: "https://eventify-api.onrender.com/api/v1/payments/mpesa/callback/"
+      - key: MPESA_ACCOUNT_REFERENCE
+        value: "Eventify"
+      - key: MPESA_TRANSACTION_DESCRIPTION
+        value: "Eventify ticket payment"
