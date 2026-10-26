@@ -32,6 +32,11 @@ export default function EventsPage() {
     api.getEvents().then((payload) => setEvents(listFrom(payload))).catch((err) => setError(err instanceof Error ? err.message : "Could not load events.")).finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    const initialCategory = new URLSearchParams(window.location.search).get("category");
+    if (initialCategory && categories.includes(initialCategory)) setCategory(initialCategory);
+  }, []);
+
   const locations = useMemo(() => ["All locations", ...Array.from(new Set(events.map((event) => event.location.split(",").at(-1)?.trim() || event.location)))], [events]);
   const filtered = useMemo(() => events.filter((event) => {
     const matchesSearch = `${event.title} ${event.description} ${event.location}`.toLowerCase().includes(search.toLowerCase());
@@ -42,6 +47,12 @@ export default function EventsPage() {
   }), [events, search, category, location, date]);
 
   const addToPlan = (event: EventItem) => {
+    const quantity = cart.find((item) => item.id === event.id)?.quantity || 0;
+    if (quantity >= event.available_tickets) {
+      setNotice(`Only ${event.available_tickets} ticket${event.available_tickets === 1 ? "" : "s"} left for ${event.title}.`);
+      window.setTimeout(() => setNotice(""), 2500);
+      return;
+    }
     setCart((items) => items.some((item) => item.id === event.id) ? items.map((item) => item.id === event.id ? { ...item, quantity: item.quantity + 1 } : item) : [...items, { ...event, quantity: 1 }]);
     setNotice(`${event.title} added to your plan.`);
     window.setTimeout(() => setNotice(""), 2500);
@@ -50,9 +61,17 @@ export default function EventsPage() {
   const removeFromPlan = (id: number) => setCart((items) => items.filter((item) => item.id !== id));
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const checkoutSuccess = (tickets: Ticket[]) => {
-    setCart([]);
-    setCheckoutOpen(false);
-    router.push(`/tickets?paid=${tickets.length}`);
+    const purchasedCounts = new Map<number, number>();
+    tickets.forEach((ticket) => purchasedCounts.set(ticket.event, (purchasedCounts.get(ticket.event) || 0) + 1));
+    const remaining = cart.flatMap((item) => {
+      const quantity = item.quantity - (purchasedCounts.get(item.id) || 0);
+      return quantity > 0 ? [{ ...item, quantity }] : [];
+    });
+    setCart(remaining);
+    if (remaining.length === 0) {
+      setCheckoutOpen(false);
+      router.push("/tickets");
+    }
   };
 
   return (

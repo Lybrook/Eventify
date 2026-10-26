@@ -39,3 +39,5 @@ The versioned API base is `/api/v1/`.
 Passwords are hashed through Django’s password hasher. Signup always creates a regular user; administrator promotion is an operational action performed through the Django admin, the seed command, or a controlled database migration. The Supabase service-role key is server-only and must never be placed in frontend environment variables.
 
 Ticket inventory is decremented inside a transaction with a row lock. A payment record stores the transaction UUID and Daraja request identifiers. Callback handling matches those identifiers, updates the payment and ticket atomically, and restores inventory exactly once if a payment fails.
+
+Retrying an active STK Push request returns the existing payment rather than sending another prompt. A ticket cannot be cancelled while its payment is pending, and terminal payment callbacks cannot reverse a prior success or failure.

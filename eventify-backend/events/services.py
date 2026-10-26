@@ -1,13 +1,12 @@
 import base64
 import os
-from datetime import datetime
 from decimal import Decimal
 
 import requests
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Payment, Ticket
+from .models import Event, Payment, Ticket
 
 
 class MpesaError(Exception):
@@ -33,13 +32,19 @@ def get_access_token():
     config = _settings()
     if not config["consumer_key"] or not config["consumer_secret"]:
         raise MpesaError("M-Pesa credentials are not configured")
-    response = requests.get(
-        f"{config['host']}/oauth/v1/generate?grant_type=client_credentials",
-        auth=(config["consumer_key"], config["consumer_secret"]),
-        timeout=20,
-    )
-    response.raise_for_status()
-    token = response.json().get("access_token")
+    try:
+        response = requests.get(
+            f"{config['host']}/oauth/v1/generate?grant_type=client_credentials",
+            auth=(config["consumer_key"], config["consumer_secret"]),
+            timeout=20,
+        )
+        response.raise_for_status()
+        data = response.json()
+    except requests.RequestException as exc:
+        raise MpesaError("Could not authenticate with M-Pesa") from exc
+    if not isinstance(data, dict):
+        raise MpesaError("M-Pesa returned an invalid authentication response")
+    token = data.get("access_token")
     if not token:
         raise MpesaError("M-Pesa did not return an access token")
     return token
@@ -68,23 +73,30 @@ def initiate_stk_push(payment: Payment):
         "AccountReference": f"{config['account_reference']}-{payment.transaction_id}",
         "TransactionDesc": config["transaction_description"],
     }
-    response = requests.post(
-        f"{config['host']}/mpesa/stkpush/v1/processrequest",
-        json=payload,
-        headers={"Authorization": f"Bearer {get_access_token()}"},
-        timeout=30,
-    )
-    response.raise_for_status()
-    data = response.json()
-    if data.get("ResponseCode") not in (None, "0", 0):
+    try:
+        response = requests.post(
+            f"{config['host']}/mpesa/stkpush/v1/processrequest",
+            json=payload,
+            headers={"Authorization": f"Bearer {get_access_token()}"},
+            timeout=30,
+        )
+        response.raise_for_status()
+        data = response.json()
+    except requests.RequestException as exc:
+        raise MpesaError("Could not initiate the M-Pesa payment") from exc
+    if not isinstance(data, dict):
+        raise MpesaError("M-Pesa returned an invalid payment response")
+    if data.get("ResponseCode") not in ("0", 0):
         raise MpesaError(data.get("ResponseDescription") or "M-Pesa rejected the STK Push")
+    if not data.get("CheckoutRequestID") or not data.get("MerchantRequestID"):
+        raise MpesaError("M-Pesa returned an incomplete payment response")
     return data
 
 
 def release_ticket_inventory(ticket: Ticket):
     if ticket.inventory_released:
         return
-    event = ticket.event
+    event = Event.objects.select_for_update().get(pk=ticket.event_id)
     event.available_tickets += 1
     event.save(update_fields=["available_tickets", "updated_at"])
     ticket.inventory_released = True

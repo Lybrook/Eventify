@@ -135,6 +135,8 @@ class TicketViewSet(viewsets.ModelViewSet):
             ticket = Ticket.objects.select_for_update().select_related("event").get(pk=ticket.pk)
             if ticket.status == Ticket.Status.PAID:
                 return Response({"detail": "Paid tickets cannot be cancelled through this endpoint."}, status=400)
+            if ticket.payments.filter(status__in=[Payment.Status.PENDING, Payment.Status.INITIATED]).exists():
+                return Response({"detail": "Tickets with an active payment cannot be cancelled yet."}, status=400)
             event = Event.objects.select_for_update().get(pk=ticket.event_id)
             if not ticket.inventory_released:
                 event.available_tickets += 1
@@ -193,6 +195,16 @@ def stk_push(request):
         if ticket.status == Ticket.Status.FAILED:
             return Response({"detail": "This ticket has failed. Book a new ticket."}, status=400)
         payment = Payment.objects.filter(ticket=ticket, status__in=[Payment.Status.PENDING, Payment.Status.INITIATED]).first()
+        if payment and payment.status == Payment.Status.PENDING:
+            return Response({
+                "message": "Payment request is already being processed. Please wait for its status to update.",
+                "payment": PaymentSerializer(payment).data,
+            })
+        if payment and payment.status == Payment.Status.INITIATED and payment.checkout_request_id:
+            return Response({
+                "message": "Payment is already in progress. Check your phone for the M-Pesa prompt.",
+                "payment": PaymentSerializer(payment).data,
+            })
         if payment is None:
             payment = Payment.objects.create(
                 ticket=ticket,
@@ -208,7 +220,7 @@ def stk_push(request):
 
     try:
         mpesa_response = initiate_stk_push(payment)
-    except (MpesaError, Exception) as exc:
+    except MpesaError as exc:
         logger.exception("M-Pesa STK Push failed")
         with transaction.atomic():
             payment = Payment.objects.get(pk=payment.pk)
@@ -233,21 +245,30 @@ def stk_push(request):
 @permission_classes([AllowAny])
 def mpesa_callback(request):
     payload = request.data
-    callback = payload.get("Body", {}).get("stkCallback", {})
+    body = payload.get("Body") if isinstance(payload, dict) else None
+    callback = body.get("stkCallback") if isinstance(body, dict) else None
+    if not isinstance(callback, dict):
+        return Response({"detail": "Invalid M-Pesa callback payload."}, status=400)
     checkout_request_id = str(callback.get("CheckoutRequestID", ""))
     merchant_request_id = str(callback.get("MerchantRequestID", ""))
     payment = Payment.objects.filter(checkout_request_id=checkout_request_id).first() if checkout_request_id else None
     if payment is None and merchant_request_id:
         payment = Payment.objects.filter(merchant_request_id=merchant_request_id).first()
     if payment is None:
-        logger.warning("Received M-Pesa callback with no matching payment: %s", payload)
+        logger.warning(
+            "Received M-Pesa callback with no matching payment (checkout=%s, merchant=%s)",
+            checkout_request_id,
+            merchant_request_id,
+        )
         return Response({"status": "accepted", "message": "Callback received."})
 
     result_code = callback.get("ResultCode")
+    if result_code is None:
+        return Response({"detail": "M-Pesa callback is missing its result code."}, status=400)
     with transaction.atomic():
         payment = Payment.objects.select_for_update().select_related("ticket__event").get(pk=payment.pk)
-        if payment.status == Payment.Status.COMPLETED:
-            return Response({"status": "success", "message": "Payment already processed."})
+        if payment.status in {Payment.Status.COMPLETED, Payment.Status.FAILED}:
+            return Response({"status": payment.status, "message": "Payment already processed."})
         payment.raw_response = payload
         ticket = Ticket.objects.select_for_update().select_related("event").get(pk=payment.ticket_id)
         if str(result_code) == "0":

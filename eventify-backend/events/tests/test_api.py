@@ -80,6 +80,98 @@ class EventifyApiTests(APITestCase):
         self.event.refresh_from_db()
         self.assertEqual(self.event.available_tickets, 1)
 
+    def test_ticket_cannot_be_cancelled_while_payment_is_active(self):
+        ticket = Ticket.objects.create(event=self.event, user=self.user, status=Ticket.Status.PENDING)
+        Payment.objects.create(
+            ticket=ticket,
+            user=self.user,
+            amount="1000.00",
+            phone_number="254712345678",
+            status=Payment.Status.INITIATED,
+            checkout_request_id="checkout-active",
+        )
+        self.authenticate("user@example.com", "user-password")
+
+        response = self.client.delete(reverse("ticket-detail", args=[ticket.id]))
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.status, Ticket.Status.PENDING)
+        self.assertFalse(ticket.inventory_released)
+
+    @patch("events.views.initiate_stk_push")
+    def test_retry_does_not_duplicate_an_inflight_payment_request(self, initiate):
+        ticket = Ticket.objects.create(event=self.event, user=self.user, status=Ticket.Status.PENDING)
+        Payment.objects.create(
+            ticket=ticket,
+            user=self.user,
+            amount="1000.00",
+            phone_number="254712345678",
+            status=Payment.Status.PENDING,
+        )
+        self.authenticate("user@example.com", "user-password")
+
+        response = self.client.post(
+            reverse("mpesa-stk-push"),
+            {"ticket_id": ticket.id, "phone_number": "254712345678"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        initiate.assert_not_called()
+
+    def test_failed_payment_callback_cannot_be_reversed_by_late_success(self):
+        ticket = Ticket.objects.create(event=self.event, user=self.user, status=Ticket.Status.PENDING)
+        payment = Payment.objects.create(
+            ticket=ticket,
+            user=self.user,
+            amount="1000.00",
+            phone_number="254712345678",
+            status=Payment.Status.INITIATED,
+            checkout_request_id="checkout-terminal",
+            merchant_request_id="merchant-terminal",
+        )
+        self.event.available_tickets = 1
+        self.event.save(update_fields=["available_tickets"])
+
+        failed_callback = {
+            "Body": {
+                "stkCallback": {
+                    "MerchantRequestID": "merchant-terminal",
+                    "CheckoutRequestID": "checkout-terminal",
+                    "ResultCode": 1,
+                    "ResultDesc": "Payment cancelled",
+                }
+            }
+        }
+        self.client.post(reverse("mpesa-callback"), failed_callback, format="json")
+        self.client.post(
+            reverse("mpesa-callback"),
+            {
+                "Body": {
+                    "stkCallback": {
+                        "MerchantRequestID": "merchant-terminal",
+                        "CheckoutRequestID": "checkout-terminal",
+                        "ResultCode": 0,
+                        "ResultDesc": "Success",
+                    }
+                }
+            },
+            format="json",
+        )
+
+        payment.refresh_from_db()
+        ticket.refresh_from_db()
+        self.event.refresh_from_db()
+        self.assertEqual(payment.status, Payment.Status.FAILED)
+        self.assertEqual(ticket.status, Ticket.Status.FAILED)
+        self.assertTrue(ticket.inventory_released)
+        self.assertEqual(self.event.available_tickets, 2)
+
+    def test_malformed_payment_callback_is_rejected(self):
+        response = self.client.post(reverse("mpesa-callback"), {"Body": []}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     @patch("events.views.initiate_stk_push")
     def test_payment_callback_marks_ticket_and_payment_paid(self, initiate):
         initiate.return_value = {
@@ -98,6 +190,13 @@ class EventifyApiTests(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        retry_response = self.client.post(
+            reverse("mpesa-stk-push"),
+            {"ticket_id": ticket_id, "phone_number": "254712345678"},
+            format="json",
+        )
+        self.assertEqual(retry_response.status_code, status.HTTP_200_OK)
+        initiate.assert_called_once()
         payment = Payment.objects.get(ticket_id=ticket_id)
         self.assertEqual(payment.status, Payment.Status.INITIATED)
 

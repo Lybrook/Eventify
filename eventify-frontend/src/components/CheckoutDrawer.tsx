@@ -41,7 +41,13 @@ export default function CheckoutDrawer({ items, open, onClose, onRemove, onSucce
       }
       onSuccess(purchased);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "We could not start payment. Please try again.");
+      const detail = err instanceof Error ? err.message : "We could not start payment. Please try again.";
+      if (purchased.length > 0) {
+        onSuccess(purchased);
+        setError(`${detail} ${purchased.length} ticket${purchased.length === 1 ? "" : "s"} already have payment prompts in progress; those are in My tickets.`);
+      } else {
+        setError(detail);
+      }
     } finally {
       setProcessing(false);
       setProgress("");
