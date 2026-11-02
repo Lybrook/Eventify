@@ -1,6 +1,8 @@
 import os
 import uuid
+from urllib.parse import quote
 
+from django.core.exceptions import ValidationError
 from django.core.files.storage import Storage
 from django.core.files.utils import validate_file_name
 from django.utils.deconstruct import deconstructible
@@ -24,6 +26,8 @@ class SupabaseStorage(Storage):
         return self._client
 
     def _save(self, name, content):
+        if content.size > 5 * 1024 * 1024:
+            raise ValidationError("Event images must be 5 MB or smaller.")
         name = validate_file_name(name, allow_relative_path=True)
         extension = os.path.splitext(name)[1].lower()
         object_name = f"events/{uuid.uuid4().hex}{extension}"
@@ -43,7 +47,10 @@ class SupabaseStorage(Storage):
         return False
 
     def url(self, name):
-        return self.client.storage.from_(self.bucket).get_public_url(name)
+        base_url = self.base_url.rstrip("/")
+        bucket = quote(self.bucket, safe="")
+        object_name = quote(name, safe="/")
+        return f"{base_url}/storage/v1/object/public/{bucket}/{object_name}"
 
     def delete(self, name):
         if name:

@@ -4,12 +4,13 @@ import Image from "next/image";
 import { CalendarDays, MapPin, Ticket, X } from "lucide-react";
 
 import { formatCurrency, formatEventDate } from "@/lib/format";
+import { getEventArtwork } from "@/lib/eventArtwork";
 import type { EventItem } from "@/types";
 
 type EventModalProps = { event: EventItem; onClose: () => void; onBook: (event: EventItem) => void };
 
 export default function EventModal({ event, onClose, onBook }: EventModalProps) {
-  const image = event.image_url || "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=900&q=80";
+  const image = getEventArtwork(event);
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-ink/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={event.title} onClick={onClose}>
       <div className="surface max-h-[90vh] w-full max-w-2xl overflow-y-auto" onClick={(e) => e.stopPropagation()}>

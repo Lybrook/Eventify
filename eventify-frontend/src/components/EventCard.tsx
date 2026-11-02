@@ -2,6 +2,7 @@ import Image from "next/image";
 import { ArrowUpRight, CalendarDays, MapPin, Ticket } from "lucide-react";
 
 import { formatCurrency, formatEventDate } from "@/lib/format";
+import { getEventArtwork } from "@/lib/eventArtwork";
 import type { EventItem } from "@/types";
 
 type EventCardProps = {
@@ -11,7 +12,7 @@ type EventCardProps = {
 };
 
 export default function EventCard({ event, onBook, onView }: EventCardProps) {
-  const image = event.image_url || "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=900&q=80";
+  const image = getEventArtwork(event);
   return (
     <article className="group overflow-hidden rounded-[1.75rem] border border-ink/10 bg-white transition duration-300 hover:-translate-y-1 hover:shadow-soft">
       <button type="button" onClick={() => onView(event)} className="relative block aspect-[1.18] w-full overflow-hidden text-left">

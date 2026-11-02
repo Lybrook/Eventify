@@ -1,5 +1,6 @@
 import base64
 import os
+import re
 from decimal import Decimal
 
 import requests
@@ -13,8 +14,21 @@ class MpesaError(Exception):
     pass
 
 
+def normalize_mpesa_phone(phone_number):
+    digits = re.sub(r"\D", "", phone_number)
+    if len(digits) == 10 and digits.startswith("0"):
+        digits = f"254{digits[1:]}"
+    elif len(digits) == 9 and digits[0] in {"1", "7"}:
+        digits = f"254{digits}"
+    if len(digits) != 12 or not digits.startswith("254") or digits[3] not in {"1", "7"}:
+        raise ValueError("Enter a valid Kenyan M-Pesa number, such as 0712 345 678.")
+    return digits
+
+
 def _settings():
     environment = os.getenv("MPESA_ENVIRONMENT", "sandbox").lower()
+    if environment not in {"sandbox", "production"}:
+        raise MpesaError("MPESA_ENVIRONMENT must be 'sandbox' or 'production'")
     host = "https://sandbox.safaricom.co.ke" if environment == "sandbox" else "https://api.safaricom.co.ke"
     return {
         "host": host,
@@ -59,7 +73,10 @@ def initiate_stk_push(payment: Payment):
     password = base64.b64encode(
         f"{config['shortcode']}{config['passkey']}{timestamp}".encode("utf-8")
     ).decode("utf-8")
-    amount = int(Decimal(payment.amount).quantize(Decimal("1")))
+    payment_amount = Decimal(payment.amount)
+    if payment_amount != payment_amount.to_integral_value():
+        raise MpesaError("M-Pesa payments must use whole Kenyan shillings.")
+    amount = int(payment_amount)
     payload = {
         "BusinessShortCode": config["shortcode"],
         "Password": password,
@@ -70,8 +87,8 @@ def initiate_stk_push(payment: Payment):
         "PartyB": config["shortcode"],
         "PhoneNumber": payment.phone_number,
         "CallBackURL": config["callback_url"],
-        "AccountReference": f"{config['account_reference']}-{payment.transaction_id}",
-        "TransactionDesc": config["transaction_description"],
+        "AccountReference": config["account_reference"][:12],
+        "TransactionDesc": config["transaction_description"][:13],
     }
     try:
         response = requests.post(
@@ -90,6 +107,43 @@ def initiate_stk_push(payment: Payment):
         raise MpesaError(data.get("ResponseDescription") or "M-Pesa rejected the STK Push")
     if not data.get("CheckoutRequestID") or not data.get("MerchantRequestID"):
         raise MpesaError("M-Pesa returned an incomplete payment response")
+    return data
+
+
+def query_stk_push(payment: Payment):
+    config = _settings()
+    if not config["passkey"] or not payment.checkout_request_id:
+        raise MpesaError("M-Pesa payment verification is not configured")
+
+    timestamp = timezone.localtime().strftime("%Y%m%d%H%M%S")
+    password = base64.b64encode(
+        f"{config['shortcode']}{config['passkey']}{timestamp}".encode("utf-8")
+    ).decode("utf-8")
+    payload = {
+        "BusinessShortCode": config["shortcode"],
+        "Password": password,
+        "Timestamp": timestamp,
+        "CheckoutRequestID": payment.checkout_request_id,
+    }
+    try:
+        response = requests.post(
+            f"{config['host']}/mpesa/stkpushquery/v1/query",
+            json=payload,
+            headers={"Authorization": f"Bearer {get_access_token()}"},
+            timeout=30,
+        )
+        response.raise_for_status()
+        data = response.json()
+    except requests.RequestException as exc:
+        raise MpesaError("Could not verify the M-Pesa payment") from exc
+    if not isinstance(data, dict) or data.get("ResponseCode") not in ("0", 0):
+        raise MpesaError("M-Pesa could not verify the payment status")
+    if (
+        str(data.get("CheckoutRequestID", "")) != payment.checkout_request_id
+        or str(data.get("MerchantRequestID", "")) != payment.merchant_request_id
+        or data.get("ResultCode") is None
+    ):
+        raise MpesaError("M-Pesa returned an incomplete payment verification response")
     return data
 
 

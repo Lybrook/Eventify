@@ -1,14 +1,24 @@
 import os
+import sys
 from datetime import timedelta
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-only-change-me")
 DEBUG = os.getenv("DJANGO_DEBUG", "false").lower() == "true"
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "").strip()
+if (
+    len(SECRET_KEY) < 50
+    or SECRET_KEY.startswith(("replace-with", "dev-only-change-me"))
+):
+    if DEBUG or "test" in sys.argv:
+        SECRET_KEY = "unsafe-local-development-key-only"
+    else:
+        raise ImproperlyConfigured("Set DJANGO_SECRET_KEY to a strong, unique value before running outside debug mode.")
 ALLOWED_HOSTS = [host.strip() for host in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if host.strip()]
 
 INSTALLED_APPS = [

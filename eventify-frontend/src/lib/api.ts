@@ -61,10 +61,38 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}, retry
   }
   const body = await response.json().catch(() => null);
   if (!response.ok) {
-    const detail = body?.detail || body?.message || "The request could not be completed.";
+    const fieldMessage = body && typeof body === "object"
+      ? Object.values(body as Record<string, unknown>)
+          .flatMap((value) => Array.isArray(value) ? value : [value])
+          .find((value): value is string => typeof value === "string")
+      : undefined;
+    const detail = body?.detail || body?.message || fieldMessage || "The request could not be completed.";
     throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
   }
   return body as T;
+}
+
+async function apiFetchAll<T>(path: string): Promise<T[]> {
+  const results: T[] = [];
+  const apiBase = new URL(API_URL);
+  let nextPath: string | null = path;
+
+  while (nextPath) {
+    const payload: T[] | Paginated<T> = await apiFetch<T[] | Paginated<T>>(nextPath);
+    if (Array.isArray(payload)) return [...results, ...payload];
+
+    results.push(...payload.results);
+    if (!payload.next) return results;
+
+    const nextUrl: URL = new URL(payload.next, API_URL);
+    const apiPathPrefix = `${apiBase.pathname}/`;
+    if (nextUrl.origin !== apiBase.origin || !nextUrl.pathname.startsWith(apiPathPrefix)) {
+      throw new Error("The API returned an invalid pagination URL.");
+    }
+    nextPath = `${nextUrl.pathname.slice(apiBase.pathname.length)}${nextUrl.search}`;
+  }
+
+  return results;
 }
 
 export function listFrom<T>(payload: T[] | Paginated<T>): T[] {
@@ -72,14 +100,14 @@ export function listFrom<T>(payload: T[] | Paginated<T>): T[] {
 }
 
 export const api = {
-  getEvents: (query = "") => apiFetch<Paginated<EventItem> | EventItem[]>(`/events/${query}`),
+  getEvents: (query = "") => apiFetchAll<EventItem>(`/events/${query}`),
   getEvent: (id: number) => apiFetch<EventItem>(`/events/${id}/`),
   createEvent: (data: FormData | Record<string, unknown>) =>
     apiFetch<EventItem>("/events/", { method: "POST", body: data instanceof FormData ? data : JSON.stringify(data) }),
   updateEvent: (id: number, data: FormData | Record<string, unknown>) =>
     apiFetch<EventItem>(`/events/${id}/`, { method: "PATCH", body: data instanceof FormData ? data : JSON.stringify(data) }),
   deleteEvent: (id: number) => apiFetch<void>(`/events/${id}/`, { method: "DELETE" }),
-  getTickets: () => apiFetch<Paginated<Ticket> | Ticket[]>("/tickets/"),
+  getTickets: () => apiFetchAll<Ticket>("/tickets/"),
   bookTicket: (eventId: number) => apiFetch<Ticket>("/tickets/", { method: "POST", body: JSON.stringify({ event_id: eventId }) }),
   cancelTicket: (id: number) => apiFetch<void>(`/tickets/${id}/`, { method: "DELETE" }),
   initiatePayment: (ticketId: number, phoneNumber: string) =>
@@ -87,7 +115,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ ticket_id: ticketId, phone_number: phoneNumber }),
     }),
-  getPayments: () => apiFetch<Paginated<Payment> | Payment[]>("/payments/"),
+  getPayments: () => apiFetchAll<Payment>("/payments/"),
   getMe: () => apiFetch<User>("/auth/me/"),
   updateMe: (data: Pick<User, "name" | "email">) => apiFetch<User>("/auth/me/", { method: "PATCH", body: JSON.stringify(data) }),
   deleteMe: (password: string) => apiFetch<void>("/auth/me/", { method: "DELETE", body: JSON.stringify({ password }) }),

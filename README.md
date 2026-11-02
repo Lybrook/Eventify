@@ -57,6 +57,7 @@ The frontend is available at `http://localhost:3000`. The repository default poi
 5. Run Django migrations against the configured database.
 
 Event image bytes are uploaded by Django to Supabase Storage. The PostgreSQL event record stores only the image reference and public URL metadata.
+Events without an uploaded image use original local SVG artwork bundled with the frontend; the demo data no longer depends on third-party image hosts.
 
 ## Authentication
 
@@ -65,7 +66,7 @@ The API uses SimpleJWT:
 - `POST /api/v1/auth/signup/` creates a regular user. The requested role is not accepted from the client.
 - `POST /api/v1/auth/token/` returns `access` and `refresh` tokens.
 - `POST /api/v1/auth/token/refresh/` refreshes the access token.
-- `GET/PATCH/DELETE /api/v1/auth/me/` reads, updates, or securely deletes the current user.
+- `GET/PATCH/DELETE /api/v1/auth/me/` reads and updates the current user. Deletion removes the account when there is no payment history; otherwise, it deactivates and anonymizes the account while preserving ticket/payment audit records and removing stored phone/raw-response data.
 - `POST /api/v1/auth/change-password/` changes the current password after verifying the old password.
 
 The Next.js client stores JWTs in browser storage and retries a request once after refreshing an expired access token. For higher-security deployments, the token transport can later be moved to an HTTP-only BFF session.
@@ -73,6 +74,7 @@ The Next.js client stores JWTs in browser storage and retries a request once aft
 ## Events, tickets, and payments
 
 Public visitors can list and retrieve events. Administrators can create, update, delete, and upload event images. Authenticated users can book tickets and view or cancel tickets that are not paid. Ticket booking decrements inventory under a database row lock.
+Ticket prices use whole Kenyan shillings; zero-priced events produce paid tickets without an M-Pesa request.
 
 The payment flow is deliberately ticket-specific:
 
@@ -80,9 +82,9 @@ The payment flow is deliberately ticket-specific:
 2. The frontend requests `POST /api/v1/payments/mpesa/stk-push/` with that ticket ID and phone number.
 3. Django creates or reuses a `Payment` row, calls Daraja, and stores merchant/check-out identifiers.
 4. Safaricom calls `POST /api/v1/payments/mpesa/callback/`.
-5. Django matches the callback to the stored payment, updates the payment status, marks the ticket paid on success, and restores inventory on failure.
+5. Django matches both request identifiers and confirms the reported outcome with Daraja’s STK Push Query API before changing payment or ticket status.
 
-The callback is idempotent for completed payments and never relies on an arbitrary callback metadata array position to identify a ticket.
+The callback is idempotent for completed payments and never relies on an arbitrary callback metadata array position to identify a ticket. It fails closed when Daraja cannot confirm the status.
 
 ## Render deployment
 

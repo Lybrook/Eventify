@@ -28,7 +28,7 @@ export default function AuthForm() {
           body: JSON.stringify(form),
         });
         const data = await response.json().catch(() => null);
-        if (!response.ok) throw new Error(data?.detail || data?.email?.[0] || "Could not create your account.");
+        if (!response.ok) throw new Error(data?.detail || data?.email?.[0] || data?.password?.[0] || "Could not create your account.");
         setNotice("Account created. Sign in to continue.");
         setIsRegister(false);
         setForm((value) => ({ ...value, password: "" }));
@@ -44,8 +44,18 @@ export default function AuthForm() {
       if (!response.ok) throw new Error(data?.detail || "Email or password is incorrect.");
       setTokens(data.access, data.refresh);
       const userResponse = await fetch(`${API_URL}/auth/me/`, { headers: { Authorization: `Bearer ${data.access}` } });
+      if (!userResponse.ok) throw new Error("Could not load your account. Please try signing in again.");
       const user = await userResponse.json();
-      router.push(user.role === "admin" ? "/admin/events" : "/events");
+      const requestedPath = new URLSearchParams(window.location.search).get("next");
+      let destination = user.role === "admin" ? "/admin/events" : "/events";
+      if (requestedPath) {
+        const target = new URL(requestedPath, window.location.origin);
+        const isAdminPath = target.pathname === "/admin" || target.pathname.startsWith("/admin/");
+        if (target.origin === window.location.origin && (user.role === "admin" || !isAdminPath)) {
+          destination = `${target.pathname}${target.search}${target.hash}`;
+        }
+      }
+      router.push(destination);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {

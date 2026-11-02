@@ -2,6 +2,8 @@ import logging
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
@@ -19,7 +21,13 @@ from .serializers import (
     TicketSerializer,
     UserSerializer,
 )
-from .services import MpesaError, initiate_stk_push, release_ticket_inventory
+from .services import (
+    MpesaError,
+    initiate_stk_push,
+    normalize_mpesa_phone,
+    query_stk_push,
+    release_ticket_inventory,
+)
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -46,9 +54,36 @@ def user_detail(request):
     if request.method == "GET":
         return Response(UserSerializer(request.user).data)
     if request.method == "DELETE":
-        if not request.user.check_password(request.data.get("password", "")):
+        password = request.data.get("password", "")
+        if not isinstance(password, str) or not request.user.check_password(password):
             return Response({"detail": "A valid password is required to delete the account."}, status=400)
-        request.user.delete()
+        with transaction.atomic():
+            user = User.objects.select_for_update().get(pk=request.user.pk)
+            if user.payments.exists():
+                Payment.objects.filter(user=user).update(phone_number="", raw_response={})
+                user.name = "Deleted user"
+                user.email = f"deleted-user-{user.pk}@deleted.eventify.invalid"
+                user.role = User.Role.USER
+                user.is_active = False
+                user.is_staff = False
+                user.is_superuser = False
+                user.set_unusable_password()
+                user.save(
+                    update_fields=[
+                        "name",
+                        "email",
+                        "role",
+                        "is_active",
+                        "is_staff",
+                        "is_superuser",
+                        "password",
+                        "updated_at",
+                    ]
+                )
+                user.groups.clear()
+                user.user_permissions.clear()
+            else:
+                user.delete()
         return Response(status=204)
     serializer = UserSerializer(request.user, data=request.data, partial=True)
     serializer.is_valid(raise_exception=True)
@@ -61,12 +96,19 @@ def user_detail(request):
 def change_password(request):
     current_password = request.data.get("current_password")
     new_password = request.data.get("new_password")
-    if not current_password or not new_password:
+    if (
+        not isinstance(current_password, str)
+        or not isinstance(new_password, str)
+        or not current_password
+        or not new_password
+    ):
         return Response({"detail": "current_password and new_password are required."}, status=400)
     if not request.user.check_password(current_password):
         return Response({"detail": "Current password is incorrect."}, status=401)
-    if len(new_password) < 8:
-        return Response({"detail": "New password must be at least 8 characters."}, status=400)
+    try:
+        validate_password(new_password, request.user)
+    except DjangoValidationError as exc:
+        return Response({"new_password": exc.messages}, status=400)
     request.user.set_password(new_password)
     request.user.save(update_fields=["password"])
     return Response({"message": "Password changed successfully."})
@@ -123,7 +165,7 @@ class TicketViewSet(viewsets.ModelViewSet):
             ticket = Ticket.objects.create(
                 event=event,
                 user=request.user,
-                status=Ticket.Status.CONFIRMED,
+                status=Ticket.Status.PAID if event.ticket_price == 0 else Ticket.Status.CONFIRMED,
             )
             event.available_tickets -= 1
             event.save(update_fields=["available_tickets", "updated_at"])
@@ -180,7 +222,13 @@ class SupportTicketViewSet(viewsets.ModelViewSet):
 @permission_classes([IsAuthenticated])
 def stk_push(request):
     ticket_id = request.data.get("ticket_id")
-    phone_number = str(request.data.get("phone_number", "")).strip()
+    phone_number = request.data.get("phone_number", "")
+    if not isinstance(phone_number, str):
+        return Response({"phone_number": "Enter a valid Kenyan M-Pesa number."}, status=400)
+    try:
+        phone_number = normalize_mpesa_phone(phone_number)
+    except ValueError as exc:
+        return Response({"phone_number": str(exc)}, status=400)
     if not ticket_id or not phone_number:
         return Response({"detail": "ticket_id and phone_number are required."}, status=400)
 
@@ -251,9 +299,12 @@ def mpesa_callback(request):
         return Response({"detail": "Invalid M-Pesa callback payload."}, status=400)
     checkout_request_id = str(callback.get("CheckoutRequestID", ""))
     merchant_request_id = str(callback.get("MerchantRequestID", ""))
-    payment = Payment.objects.filter(checkout_request_id=checkout_request_id).first() if checkout_request_id else None
-    if payment is None and merchant_request_id:
-        payment = Payment.objects.filter(merchant_request_id=merchant_request_id).first()
+    if not checkout_request_id or not merchant_request_id:
+        return Response({"detail": "M-Pesa callback is missing its request identifiers."}, status=400)
+    payment = Payment.objects.filter(
+        checkout_request_id=checkout_request_id,
+        merchant_request_id=merchant_request_id,
+    ).first()
     if payment is None:
         logger.warning(
             "Received M-Pesa callback with no matching payment (checkout=%s, merchant=%s)",
@@ -265,14 +316,28 @@ def mpesa_callback(request):
     result_code = callback.get("ResultCode")
     if result_code is None:
         return Response({"detail": "M-Pesa callback is missing its result code."}, status=400)
+    if payment.status in {Payment.Status.COMPLETED, Payment.Status.FAILED}:
+        return Response({"status": payment.status, "message": "Payment already processed."})
+    try:
+        verification = query_stk_push(payment)
+    except MpesaError:
+        logger.exception("Could not verify M-Pesa callback against Safaricom")
+        return Response({"detail": "Payment status could not be verified yet."}, status=503)
+
     with transaction.atomic():
         payment = Payment.objects.select_for_update().select_related("ticket__event").get(pk=payment.pk)
         if payment.status in {Payment.Status.COMPLETED, Payment.Status.FAILED}:
             return Response({"status": payment.status, "message": "Payment already processed."})
-        payment.raw_response = payload
+        payment.raw_response = {"callback": payload, "verification": verification}
         ticket = Ticket.objects.select_for_update().select_related("event").get(pk=payment.ticket_id)
-        if str(result_code) == "0":
-            metadata = {item.get("Name"): item.get("Value") for item in callback.get("CallbackMetadata", {}).get("Item", [])}
+        if str(verification["ResultCode"]) == "0":
+            callback_metadata = callback.get("CallbackMetadata")
+            items = callback_metadata.get("Item", []) if isinstance(callback_metadata, dict) else []
+            metadata = {
+                item.get("Name"): item.get("Value")
+                for item in items
+                if isinstance(item, dict) and item.get("Name")
+            } if isinstance(items, list) else {}
             payment.status = Payment.Status.COMPLETED
             payment.mpesa_receipt_number = str(metadata.get("MpesaReceiptNumber", ""))
             ticket.status = Ticket.Status.PAID

@@ -44,7 +44,7 @@ export default function HomePage() {
               <p className="mt-1 font-display text-xl font-bold">Find your people.</p>
             </div>
             <div className="relative aspect-[0.88] overflow-hidden rounded-[3rem] bg-ink shadow-soft">
-              <Image src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=1200&q=85" alt="A crowd enjoying a live event" fill priority className="object-cover opacity-85" sizes="(max-width: 1024px) 90vw, 45vw" />
+              <Image src="/images/eventify-hero.svg" alt="Illustrated crowd enjoying a live event" fill priority className="object-cover opacity-85" sizes="(max-width: 1024px) 90vw, 45vw" />
               <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-transparent to-coral/10" />
               <div className="absolute bottom-0 left-0 right-0 p-7 text-white sm:p-9">
                 <div className="mb-4 flex items-center gap-2 text-sm text-white/70"><CalendarDays size={16} /> Find something for your calendar</div>
@@ -86,7 +86,7 @@ export default function HomePage() {
 
       <section className="bg-sand py-20 lg:py-28">
         <div className="section-shell grid gap-10 lg:grid-cols-[1fr_1fr] lg:items-center">
-          <div className="surface overflow-hidden bg-[#d8e4e7] p-3 shadow-none"><div className="relative aspect-[1.2] overflow-hidden rounded-[1.5rem]"><Image src="https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1000&q=85" alt="People gathering for a conference" fill className="object-cover" sizes="(max-width: 1024px) 90vw, 45vw" /><div className="absolute inset-x-5 bottom-5 rounded-2xl bg-white/90 p-4 backdrop-blur"><div className="flex items-center justify-between"><span className="eyebrow">Make a connection</span><span className="text-sm font-bold text-ink">Your next idea</span></div><p className="mt-1 font-display text-xl font-bold">Find a room full of possibility.</p></div></div></div>
+          <div className="surface overflow-hidden bg-[#d8e4e7] p-3 shadow-none"><div className="relative aspect-[1.2] overflow-hidden rounded-[1.5rem]"><Image src="/images/eventify-tech.svg" alt="Illustrated technology gathering" fill className="object-cover" sizes="(max-width: 1024px) 90vw, 45vw" /><div className="absolute inset-x-5 bottom-5 rounded-2xl bg-white/90 p-4 backdrop-blur"><div className="flex items-center justify-between"><span className="eyebrow">Make a connection</span><span className="text-sm font-bold text-ink">Your next idea</span></div><p className="mt-1 font-display text-xl font-bold">Find a room full of possibility.</p></div></div></div>
           <div className="lg:pl-10"><p className="eyebrow mb-4">For organizers, too</p><h2 className="font-display text-4xl font-bold leading-tight tracking-tight sm:text-5xl">Put your event in the right room.</h2><p className="mt-6 max-w-lg text-lg leading-8 text-ink/65">Create a beautiful listing, keep inventory clear, and let attendees focus on why they want to be there. Event management that feels human.</p><div className="mt-8 flex flex-wrap gap-3"><Link href="/signin" className="button-primary">Create an organizer account <ArrowUpRight size={17} /></Link><Link href="/support" className="button-secondary">Talk to us</Link></div></div>
         </div>
       </section>

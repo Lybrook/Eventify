@@ -1,4 +1,6 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from .models import Event, Payment, SupportTicket, Ticket
@@ -19,6 +21,14 @@ class SignupSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["name", "email", "password"]
+
+    def validate(self, attrs):
+        candidate = User(name=attrs["name"], email=attrs["email"])
+        try:
+            validate_password(attrs["password"], candidate)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"password": exc.messages}) from exc
+        return attrs
 
     def create(self, validated_data):
         return User.objects.create_user(role=User.Role.USER, **validated_data)
@@ -55,6 +65,16 @@ class EventSerializer(serializers.ModelSerializer):
         if not attrs.get("title", getattr(self.instance, "title", "")):
             raise serializers.ValidationError({"title": "Title is required."})
         return attrs
+
+    def validate_image(self, image):
+        if image and image.size > 5 * 1024 * 1024:
+            raise serializers.ValidationError("Event images must be 5 MB or smaller.")
+        return image
+
+    def validate_ticket_price(self, value):
+        if value != value.to_integral_value():
+            raise serializers.ValidationError("Ticket prices must use whole Kenyan shillings.")
+        return value
 
 
 class TicketSerializer(serializers.ModelSerializer):

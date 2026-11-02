@@ -1,8 +1,14 @@
 import uuid
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
+
+
+def validate_whole_kenyan_shillings(value):
+    if value != value.to_integral_value():
+        raise ValidationError("Amounts must use whole Kenyan shillings.")
 
 
 class UserManager(BaseUserManager):
@@ -50,7 +56,11 @@ class Event(models.Model):
     location = models.CharField(max_length=255)
     category = models.CharField(max_length=100)
     featured = models.BooleanField(default=False)
-    ticket_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
+    ticket_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(0), validate_whole_kenyan_shillings],
+    )
     available_tickets = models.PositiveIntegerField(default=100)
     image = models.ImageField(upload_to="events/", blank=True, null=True)
     image_url = models.URLField(blank=True)
@@ -100,7 +110,11 @@ class Payment(models.Model):
 
     ticket = models.ForeignKey(Ticket, on_delete=models.PROTECT, related_name="payments")
     user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="payments")
-    amount = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(0), validate_whole_kenyan_shillings],
+    )
     phone_number = models.CharField(max_length=20)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     transaction_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
