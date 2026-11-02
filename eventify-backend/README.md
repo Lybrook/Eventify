@@ -34,6 +34,12 @@ The versioned API base is `/api/v1/`.
 | Users | admin-only `/users/` resource |
 | Support | public create at `/support-tickets/`, admin management thereafter |
 
+## Configure Safaricom Daraja
+
+For local development, copy `.env.example` to `.env` in this `eventify-backend/` directory. Replace `MPESA_CONSUMER_KEY` and `MPESA_CONSUMER_SECRET` with the values from your Daraja app; also set `MPESA_PASSKEY` and a publicly reachable HTTPS `MPESA_CALLBACK_URL` before testing STK Push. Keep `MPESA_ENVIRONMENT=sandbox` while using sandbox credentials.
+
+The backend fetches the OAuth access token from Daraja and sends it as a Bearer token for STK Push and payment-status queries. On Render, set the same `MPESA_*` values in the `eventify-api` service's **Environment** settings. Never put Daraja credentials in the frontend's `.env.local` or commit real credentials to Git.
+
 ## Security notes
 
 Passwords are hashed through Django’s password hasher. Signup always creates a regular user; administrator and event-organizer roles must be assigned through the Django admin by an administrator. Organizers can manage events but do not receive administrator access to users, payments, or support requests. The Supabase service-role key is server-only and must never be placed in frontend environment variables.

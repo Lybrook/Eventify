@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from events.models import Event, Payment, SupportTicket, Ticket, User
-from events.services import MpesaError
+from events.services import MpesaError, get_access_token, initiate_stk_push, query_stk_push
 
 
 class EventifyApiTests(APITestCase):
@@ -34,6 +34,90 @@ class EventifyApiTests(APITestCase):
             category="Music",
             ticket_price="1000.00",
             available_tickets=2,
+        )
+
+    def test_get_access_token_uses_configured_sandbox_credentials(self):
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "MPESA_ENVIRONMENT": "sandbox",
+                    "MPESA_CONSUMER_KEY": "test-consumer-key",
+                    "MPESA_CONSUMER_SECRET": "test-consumer-secret",
+                },
+            ),
+            patch("events.services.requests.get") as request_get,
+        ):
+            request_get.return_value.json.return_value = {"access_token": "sandbox-token"}
+
+            token = get_access_token()
+
+        self.assertEqual(token, "sandbox-token")
+        request_get.assert_called_once_with(
+            "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials",
+            auth=("test-consumer-key", "test-consumer-secret"),
+            timeout=20,
+        )
+
+    def test_stk_push_uses_daraja_bearer_token(self):
+        ticket = Ticket.objects.create(event=self.event, user=self.user, status=Ticket.Status.PENDING)
+        payment = Payment.objects.create(
+            ticket=ticket,
+            user=self.user,
+            amount="1000.00",
+            phone_number="254712345678",
+        )
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "MPESA_PASSKEY": "test-passkey",
+                    "MPESA_CALLBACK_URL": "https://example.com/callback/",
+                },
+            ),
+            patch("events.services.get_access_token", return_value="sandbox-token"),
+            patch("events.services.requests.post") as request_post,
+        ):
+            request_post.return_value.json.return_value = {
+                "ResponseCode": "0",
+                "MerchantRequestID": "merchant-1",
+                "CheckoutRequestID": "checkout-1",
+            }
+
+            initiate_stk_push(payment)
+
+        self.assertEqual(
+            request_post.call_args.kwargs["headers"],
+            {"Authorization": "Bearer sandbox-token"},
+        )
+
+    def test_stk_push_query_uses_daraja_bearer_token(self):
+        ticket = Ticket.objects.create(event=self.event, user=self.user, status=Ticket.Status.PENDING)
+        payment = Payment.objects.create(
+            ticket=ticket,
+            user=self.user,
+            amount="1000.00",
+            phone_number="254712345678",
+            checkout_request_id="checkout-1",
+            merchant_request_id="merchant-1",
+        )
+        with (
+            patch.dict("os.environ", {"MPESA_PASSKEY": "test-passkey"}),
+            patch("events.services.get_access_token", return_value="sandbox-token"),
+            patch("events.services.requests.post") as request_post,
+        ):
+            request_post.return_value.json.return_value = {
+                "ResponseCode": "0",
+                "ResultCode": 0,
+                "CheckoutRequestID": "checkout-1",
+                "MerchantRequestID": "merchant-1",
+            }
+
+            query_stk_push(payment)
+
+        self.assertEqual(
+            request_post.call_args.kwargs["headers"],
+            {"Authorization": "Bearer sandbox-token"},
         )
 
     def authenticate(self, email, password):
