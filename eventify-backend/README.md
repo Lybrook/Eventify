@@ -27,7 +27,7 @@ The versioned API base is `/api/v1/`.
 | Health | `GET /health/` |
 | Auth | `POST /auth/signup/`, `POST /auth/token/`, `POST /auth/token/refresh/` |
 | Current account | `GET/PATCH/DELETE /auth/me/`, `POST /auth/change-password/` |
-| Events | `GET /events/`, `GET /events/<id>/`, admin `POST/PATCH/DELETE` |
+| Events | `GET /events/`, `GET /events/<id>/`, admin/organizer `POST/PATCH/DELETE` |
 | Tickets | authenticated `GET/POST /tickets/`, authenticated `DELETE /tickets/<id>/` |
 | Payments | authenticated `GET /payments/`, `POST /payments/mpesa/stk-push/` |
 | M-Pesa callback | `POST /payments/mpesa/callback/` |
@@ -36,7 +36,7 @@ The versioned API base is `/api/v1/`.
 
 ## Security notes
 
-Passwords are hashed through Django’s password hasher. Signup always creates a regular user; administrator promotion is an operational action performed through the Django admin, the seed command, or a controlled database migration. The Supabase service-role key is server-only and must never be placed in frontend environment variables.
+Passwords are hashed through Django’s password hasher. Signup always creates a regular user; administrator and event-organizer roles must be assigned through the Django admin by an administrator. Organizers can manage events but do not receive administrator access to users, payments, or support requests. The Supabase service-role key is server-only and must never be placed in frontend environment variables.
 
 Ticket inventory is decremented inside a transaction with a row lock. A payment record stores the transaction UUID and Daraja request identifiers. Callback handling matches both request identifiers and confirms the result through Daraja’s STK Push Query API before updating the payment and ticket atomically; failed payments release inventory exactly once. Account deletion anonymizes accounts with payment history so transaction records remain intact.
 Ticket prices are whole Kenyan shillings because Daraja accepts integer amounts. Free events create paid tickets directly without calling M-Pesa.

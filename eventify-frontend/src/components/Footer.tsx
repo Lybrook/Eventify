@@ -1,12 +1,14 @@
 import Link from "next/link";
 
+import BrandMark from "@/components/BrandMark";
+
 export default function Footer() {
   return (
     <footer className="border-t border-ink/10 bg-ink text-white">
       <div className="section-shell grid gap-12 py-16 md:grid-cols-[1.2fr_0.8fr_0.8fr]">
         <div>
           <div className="mb-5 flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-coral font-display text-xl font-black">E</span>
+            <BrandMark className="h-10 w-10" />
             <span className="font-display text-2xl font-bold">eventify</span>
           </div>
           <p className="max-w-sm text-sm leading-7 text-white/60">

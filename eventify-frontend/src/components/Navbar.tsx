@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { CalendarDays, ChevronRight, Menu, Ticket, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import BrandMark from "@/components/BrandMark";
 import { api, clearTokens, getAccessToken } from "@/lib/api";
 import type { User } from "@/types";
 
@@ -54,7 +55,7 @@ export default function Navbar() {
     <header className="fixed inset-x-0 top-0 z-50 border-b border-ink/10 bg-sand/90 backdrop-blur-xl">
       <div className="section-shell flex h-20 items-center justify-between">
         <Link href="/" className="group flex items-center gap-3" onClick={() => setOpen(false)}>
-          <span className="grid h-10 w-10 place-items-center rounded-2xl bg-ink font-display text-xl font-black text-white transition group-hover:bg-coral">E</span>
+          <BrandMark className="h-10 w-10 transition group-hover:scale-105" />
           <span className="font-display text-2xl font-bold tracking-tight text-ink">eventify<span className="text-coral">.</span></span>
         </Link>
 
@@ -64,7 +65,7 @@ export default function Navbar() {
               {link.label}
             </Link>
           ))}
-          {user?.role === "admin" && (
+          {(user?.role === "admin" || user?.role === "organizer") && (
             <Link href="/admin/events" className={`text-sm font-semibold transition hover:text-coral ${pathname.startsWith("/admin") ? "text-coral" : "text-ink/65"}`}>
               Manage events
             </Link>
@@ -94,7 +95,7 @@ export default function Navbar() {
         <div className="border-t border-ink/10 bg-sand px-5 py-5 shadow-lg md:hidden">
           <nav className="grid gap-2">
             {links.map((link) => <button key={link.href} onClick={() => goTo(link.href)} className="flex items-center justify-between rounded-2xl px-4 py-3 text-left text-sm font-semibold text-ink/70 hover:bg-white">{link.label}<ChevronRight size={16} /></button>)}
-            {user?.role === "admin" && <button onClick={() => goTo("/admin/events")} className="flex items-center justify-between rounded-2xl px-4 py-3 text-left text-sm font-semibold text-ink/70 hover:bg-white">Manage events<ChevronRight size={16} /></button>}
+            {(user?.role === "admin" || user?.role === "organizer") && <button onClick={() => goTo("/admin/events")} className="flex items-center justify-between rounded-2xl px-4 py-3 text-left text-sm font-semibold text-ink/70 hover:bg-white">Manage events<ChevronRight size={16} /></button>}
             {user ? (
               <>
                 <button onClick={() => goTo("/tickets")} className="flex items-center justify-between rounded-2xl px-4 py-3 text-left text-sm font-semibold text-ink/70 hover:bg-white">My tickets<ChevronRight size={16} /></button>

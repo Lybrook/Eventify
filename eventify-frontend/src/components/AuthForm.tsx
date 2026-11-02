@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+import BrandMark from "@/components/BrandMark";
 import { API_URL, setTokens } from "@/lib/api";
 
 export default function AuthForm() {
@@ -47,11 +48,12 @@ export default function AuthForm() {
       if (!userResponse.ok) throw new Error("Could not load your account. Please try signing in again.");
       const user = await userResponse.json();
       const requestedPath = new URLSearchParams(window.location.search).get("next");
-      let destination = user.role === "admin" ? "/admin/events" : "/events";
+      const canManageEvents = user.role === "admin" || user.role === "organizer";
+      let destination = canManageEvents ? "/admin/events" : "/events";
       if (requestedPath) {
         const target = new URL(requestedPath, window.location.origin);
         const isAdminPath = target.pathname === "/admin" || target.pathname.startsWith("/admin/");
-        if (target.origin === window.location.origin && (user.role === "admin" || !isAdminPath)) {
+        if (target.origin === window.location.origin && (canManageEvents || !isAdminPath)) {
           destination = `${target.pathname}${target.search}${target.hash}`;
         }
       }
@@ -68,7 +70,7 @@ export default function AuthForm() {
       <div className="relative hidden overflow-hidden bg-ink p-10 text-white lg:block">
         <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-coral/40 blur-3xl" />
         <div className="relative flex h-full flex-col justify-between">
-          <div><span className="grid h-12 w-12 place-items-center rounded-2xl bg-coral font-display text-2xl font-black">E</span><p className="mt-12 max-w-xs font-display text-4xl font-bold leading-tight">Your next good plan starts here.</p></div>
+          <div><BrandMark className="h-12 w-12" /><p className="mt-12 max-w-xs font-display text-4xl font-bold leading-tight">Your next good plan starts here.</p></div>
           <p className="max-w-xs text-sm leading-7 text-white/55">Keep your tickets in one place, discover the right rooms, and show up ready.</p>
         </div>
       </div>

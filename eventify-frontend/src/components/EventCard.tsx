@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { ArrowUpRight, CalendarDays, MapPin, Ticket } from "lucide-react";
 
+import BrandMark from "@/components/BrandMark";
 import { formatCurrency, formatEventDate } from "@/lib/format";
 import { getEventArtwork } from "@/lib/eventArtwork";
 import type { EventItem } from "@/types";
@@ -18,6 +19,7 @@ export default function EventCard({ event, onBook, onView }: EventCardProps) {
       <button type="button" onClick={() => onView(event)} className="relative block aspect-[1.18] w-full overflow-hidden text-left">
         <Image src={image} alt={event.title} fill className="object-cover transition duration-500 group-hover:scale-105" sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw" />
         <div className="absolute inset-0 bg-gradient-to-t from-ink/65 via-transparent to-transparent" />
+        {!event.image_url && <BrandMark className="absolute right-4 top-4 h-8 w-8 rounded-xl shadow" />}
         <div className="absolute left-4 top-4 flex items-center gap-2"><span className="rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-ink">{event.category}</span>{event.featured && <span className="rounded-full bg-coral px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white">Featured</span>}</div>
         <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between text-white"><span className="flex items-center gap-2 text-xs font-semibold"><CalendarDays size={14} /> {formatEventDate(event.date)}</span><span className="grid h-9 w-9 place-items-center rounded-full bg-white/20 backdrop-blur transition group-hover:bg-coral"><ArrowUpRight size={17} /></span></div>
       </button>

@@ -20,6 +20,12 @@ class EventifyApiTests(APITestCase):
             password="admin-password",
             name="Admin User",
         )
+        self.organizer = User.objects.create_user(
+            email="organizer@example.com",
+            password="organizer-password",
+            name="Event Organizer",
+            role=User.Role.ORGANIZER,
+        )
         self.event = Event.objects.create(
             title="Test Event",
             description="A test event",
@@ -39,14 +45,58 @@ class EventifyApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {response.data['access']}")
 
-    def test_signup_never_accepts_admin_role(self):
+    def test_signup_never_accepts_privileged_role(self):
+        for role in (User.Role.ORGANIZER, User.Role.ADMIN):
+            with self.subTest(role=role):
+                email = f"attacker-{role}@example.com"
+                response = self.client.post(
+                    reverse("signup"),
+                    {
+                        "name": "Attacker",
+                        "email": email,
+                        "password": "safe-password",
+                        "role": role,
+                    },
+                    format="json",
+                )
+                self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+                self.assertEqual(User.objects.get(email=email).role, User.Role.USER)
+
+    def test_event_organizer_can_create_update_and_delete_events(self):
+        self.authenticate("organizer@example.com", "organizer-password")
         response = self.client.post(
-            reverse("signup"),
-            {"name": "Attacker", "email": "attacker@example.com", "password": "safe-password", "role": "admin"},
+            reverse("event-list"),
+            {
+                "title": "Organizer Event",
+                "description": "Created by an event organizer",
+                "date": "2026-12-01",
+                "location": "Mombasa",
+                "category": "Technology",
+                "ticket_price": "1200.00",
+                "available_tickets": 20,
+            },
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(User.objects.get(email="attacker@example.com").role, User.Role.USER)
+        event_id = response.data["id"]
+
+        response = self.client.patch(
+            reverse("event-detail", args=[event_id]),
+            {"title": "Updated Organizer Event"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["title"], "Updated Organizer Event")
+
+        response = self.client.delete(reverse("event-detail", args=[event_id]))
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_event_organizer_does_not_get_admin_access(self):
+        self.authenticate("organizer@example.com", "organizer-password")
+
+        response = self.client.get(reverse("user-list"))
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_signup_rejects_common_passwords(self):
         response = self.client.post(

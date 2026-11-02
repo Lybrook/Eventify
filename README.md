@@ -73,7 +73,7 @@ The Next.js client stores JWTs in browser storage and retries a request once aft
 
 ## Events, tickets, and payments
 
-Public visitors can list and retrieve events. Administrators can create, update, delete, and upload event images. Authenticated users can book tickets and view or cancel tickets that are not paid. Ticket booking decrements inventory under a database row lock.
+Public visitors can list and retrieve events. Administrators and event organizers can create, update, delete, and upload event images. An administrator assigns the organizer role through Django admin; public sign-up cannot grant privileged roles. Authenticated users can book tickets and view or cancel tickets that are not paid. Ticket booking decrements inventory under a database row lock.
 Ticket prices use whole Kenyan shillings; zero-priced events produce paid tickets without an M-Pesa request.
 
 The payment flow is deliberately ticket-specific:

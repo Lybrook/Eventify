@@ -21,7 +21,7 @@ The committed default API base is `https://eventify-x749.onrender.com/api/v1`. T
 | `/signin` | Registration and SimpleJWT login. |
 | `/tickets` | Authenticated ticket wallet; pending M-Pesa payments refresh automatically while awaiting callback confirmation. |
 | `/profile` | Profile, password, and account settings. |
-| `/admin/events` | Administrator event CRUD with image upload. |
+| `/admin/events` | Administrator and event-organizer event CRUD with image upload. |
 | `/about` | Product mission and operating principles. |
 | `/support` | Contact methods and persisted support requests. |
 

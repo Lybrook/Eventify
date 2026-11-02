@@ -12,7 +12,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from .models import Event, Payment, SupportTicket, Ticket
-from .permissions import IsAdminRole
+from .permissions import IsAdminRole, IsEventManager
 from .serializers import (
     EventSerializer,
     PaymentSerializer,
@@ -121,7 +121,7 @@ class EventViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in {"list", "retrieve"}:
             return [AllowAny()]
-        return [IsAdminRole()]
+        return [IsEventManager()]
 
     def get_queryset(self):
         queryset = super().get_queryset()

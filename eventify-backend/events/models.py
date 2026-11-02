@@ -32,6 +32,7 @@ class UserManager(BaseUserManager):
 class User(AbstractUser):
     class Role(models.TextChoices):
         USER = "user", "User"
+        ORGANIZER = "organizer", "Event organizer"
         ADMIN = "admin", "Admin"
 
     username = None
