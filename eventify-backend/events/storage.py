@@ -1,11 +1,13 @@
 import os
 import uuid
+from io import BytesIO
 from urllib.parse import quote
 
 from django.core.exceptions import ValidationError
 from django.core.files.storage import Storage
 from django.core.files.utils import validate_file_name
 from django.utils.deconstruct import deconstructible
+from PIL import Image, ImageOps, UnidentifiedImageError
 from supabase import create_client
 
 
@@ -30,13 +32,38 @@ class SupabaseStorage(Storage):
             raise ValidationError("Event images must be 5 MB or smaller.")
         name = validate_file_name(name, allow_relative_path=True)
         extension = os.path.splitext(name)[1].lower()
-        object_name = f"events/{uuid.uuid4().hex}{extension}"
         payload = content.read()
         content_type = getattr(content, "content_type", None) or "application/octet-stream"
+        try:
+            with Image.open(BytesIO(payload)) as image:
+                if image.format in {"JPEG", "PNG", "WEBP"} and getattr(image, "n_frames", 1) == 1:
+                    image = ImageOps.exif_transpose(image)
+                    image.thumbnail((1920, 1920), Image.Resampling.LANCZOS)
+                    has_alpha = "A" in image.getbands() or "transparency" in image.info
+                    optimized = BytesIO()
+                    image.convert("RGBA" if has_alpha else "RGB").save(
+                        optimized,
+                        format="WEBP",
+                        quality=82,
+                        method=4,
+                    )
+                    optimized_payload = optimized.getvalue()
+                    if len(optimized_payload) < len(payload):
+                        payload = optimized_payload
+                        extension = ".webp"
+                        content_type = "image/webp"
+        except UnidentifiedImageError:
+            pass
+
+        object_name = f"events/{uuid.uuid4().hex}{extension}"
         self.client.storage.from_(self.bucket).upload(
             object_name,
             payload,
-            {"content-type": content_type, "upsert": "false"},
+            {
+                "cache-control": "31536000",
+                "content-type": content_type,
+                "upsert": "false",
+            },
         )
         return object_name
 

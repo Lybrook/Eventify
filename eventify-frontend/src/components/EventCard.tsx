@@ -8,16 +8,17 @@ import type { EventItem } from "@/types";
 
 type EventCardProps = {
   event: EventItem;
+  priority?: boolean;
   onBook: (event: EventItem) => void;
   onView: (event: EventItem) => void;
 };
 
-export default function EventCard({ event, onBook, onView }: EventCardProps) {
+export default function EventCard({ event, priority = false, onBook, onView }: EventCardProps) {
   const image = getEventArtwork(event);
   return (
     <article className="group overflow-hidden rounded-[1.75rem] border border-ink/10 bg-white transition duration-300 hover:-translate-y-1 hover:shadow-soft">
       <button type="button" onClick={() => onView(event)} className="relative block aspect-[1.18] w-full overflow-hidden text-left">
-        <Image src={image} alt={event.title} fill className="object-cover transition duration-500 group-hover:scale-105" sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw" />
+        <Image src={image} alt={event.title} fill loading={priority ? "eager" : "lazy"} fetchPriority={priority ? "high" : "auto"} className="object-cover transition duration-500 group-hover:scale-105" sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw" />
         <div className="absolute inset-0 bg-gradient-to-t from-ink/65 via-transparent to-transparent" />
         {!event.image_url && <BrandMark className="absolute right-4 top-4 h-8 w-8 rounded-xl shadow" />}
         <div className="absolute left-4 top-4 flex items-center gap-2"><span className="rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-ink">{event.category}</span>{event.featured && <span className="rounded-full bg-coral px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white">Featured</span>}</div>

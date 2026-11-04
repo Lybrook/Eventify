@@ -57,6 +57,7 @@ The frontend is available at `http://localhost:3000`. The repository default poi
 5. Run Django migrations against the configured database.
 
 Event image bytes are uploaded by Django to Supabase Storage. The PostgreSQL event record stores only the image reference and public URL metadata.
+Single-frame JPEG, PNG, and WebP uploads are resized to a maximum 1920-pixel edge and stored as WebP when that reduces the file size. Randomized image object names are served with a one-year immutable cache lifetime.
 Events without an uploaded image use original local SVG artwork bundled with the frontend; the demo data no longer depends on third-party image hosts.
 
 ## Authentication

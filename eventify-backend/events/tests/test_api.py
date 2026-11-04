@@ -238,6 +238,19 @@ class EventifyApiTests(APITestCase):
         response = self.client.get(reverse("event-list"))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["results"][0]["title"], "Test Event")
+        self.assertEqual(response["Cache-Control"], "public, max-age=30, stale-while-revalidate=60")
+
+        for index in range(24):
+            Event.objects.create(
+                title=f"Additional Event {index}",
+                date="2026-12-01",
+                location="Nairobi",
+                category="Music",
+                ticket_price="100.00",
+            )
+        response = self.client.get(reverse("event-list"))
+        self.assertEqual(len(response.data["results"]), 24)
+        self.assertIsNotNone(response.data["next"])
 
         self.authenticate("user@example.com", "user-password")
         response = self.client.post(reverse("event-list"), {"title": "Nope"}, format="json")

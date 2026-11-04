@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404
 from django.utils.dateparse import parse_date
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
@@ -120,6 +121,11 @@ class EventViewSet(viewsets.ModelViewSet):
     queryset = Event.objects.all()
     serializer_class = EventSerializer
 
+    class Pagination(PageNumberPagination):
+        page_size = 24
+
+    pagination_class = Pagination
+
     def get_permissions(self):
         if self.action in {"list", "retrieve", "locations"}:
             return [AllowAny()]
@@ -147,6 +153,13 @@ class EventViewSet(viewsets.ModelViewSet):
         if featured in {"true", "false"}:
             queryset = queryset.filter(featured=featured == "true")
         return queryset
+
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(request, response, *args, **kwargs)
+        if request.method == "GET" and self.action in {"list", "retrieve", "locations"}:
+            max_age = 300 if self.action == "locations" else 30
+            response["Cache-Control"] = f"public, max-age={max_age}, stale-while-revalidate=60"
+        return response
 
     @action(detail=False, methods=["get"])
     def locations(self, request):

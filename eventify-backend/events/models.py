@@ -70,6 +70,7 @@ class Event(models.Model):
 
     class Meta:
         ordering = ["date", "title"]
+        indexes = [models.Index(fields=["date", "title"], name="evt_date_title_idx")]
 
     def __str__(self):
         return self.title
