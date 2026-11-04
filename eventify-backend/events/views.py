@@ -5,9 +5,11 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from django.utils.dateparse import parse_date
 from rest_framework import status, viewsets
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
@@ -119,7 +121,7 @@ class EventViewSet(viewsets.ModelViewSet):
     serializer_class = EventSerializer
 
     def get_permissions(self):
-        if self.action in {"list", "retrieve"}:
+        if self.action in {"list", "retrieve", "locations"}:
             return [AllowAny()]
         return [IsEventManager()]
 
@@ -128,16 +130,33 @@ class EventViewSet(viewsets.ModelViewSet):
         search = self.request.query_params.get("search")
         category = self.request.query_params.get("category")
         location = self.request.query_params.get("location")
+        event_date = self.request.query_params.get("date")
         featured = self.request.query_params.get("featured")
         if search:
-            queryset = queryset.filter(title__icontains=search)
+            queryset = queryset.filter(
+                Q(title__icontains=search)
+                | Q(description__icontains=search)
+                | Q(location__icontains=search)
+            )
         if category:
             queryset = queryset.filter(category__iexact=category)
         if location:
             queryset = queryset.filter(location__icontains=location)
+        if event_date and (parsed_date := parse_date(event_date)):
+            queryset = queryset.filter(date=parsed_date)
         if featured in {"true", "false"}:
             queryset = queryset.filter(featured=featured == "true")
         return queryset
+
+    @action(detail=False, methods=["get"])
+    def locations(self, request):
+        locations = (
+            Event.objects.order_by()
+            .values_list("location", flat=True)
+            .distinct()
+            .order_by("location")
+        )
+        return Response(list(locations))
 
 
 class TicketViewSet(viewsets.ModelViewSet):
@@ -149,8 +168,14 @@ class TicketViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         if self.request.user.role == User.Role.ADMIN:
-            return queryset
-        return queryset.filter(user=self.request.user)
+            scoped_queryset = queryset
+        else:
+            scoped_queryset = queryset.filter(user=self.request.user)
+        if self.request.query_params.get("pending") == "true":
+            return scoped_queryset.filter(
+                status__in=[Ticket.Status.PENDING, Ticket.Status.CONFIRMED]
+            )
+        return scoped_queryset
 
     def create(self, request, *args, **kwargs):
         event_id = request.data.get("event") or request.data.get("event_id")
@@ -197,8 +222,14 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         if self.request.user.role == User.Role.ADMIN:
-            return queryset
-        return queryset.filter(user=self.request.user)
+            scoped_queryset = queryset
+        else:
+            scoped_queryset = queryset.filter(user=self.request.user)
+        if self.request.query_params.get("pending") == "true":
+            return scoped_queryset.filter(
+                status__in=[Payment.Status.PENDING, Payment.Status.INITIATED]
+            )
+        return scoped_queryset
 
 
 class UserViewSet(viewsets.ModelViewSet):

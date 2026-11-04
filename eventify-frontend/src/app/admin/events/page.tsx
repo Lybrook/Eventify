@@ -34,16 +34,14 @@ const emptyForm = {
   image: null as File | null,
 };
 
-function sortEvents(events: EventItem[]) {
-  return events.sort((left, right) =>
-    left.date.localeCompare(right.date) || left.title.localeCompare(right.title),
-  );
-}
-
 export default function AdminEventsPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [events, setEvents] = useState<EventItem[]>([]);
+  const [eventCount, setEventCount] = useState(0);
+  const [eventPage, setEventPage] = useState(1);
+  const [hasPreviousPage, setHasPreviousPage] = useState(false);
+  const [hasNextPage, setHasNextPage] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [editing, setEditing] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,7 +49,8 @@ export default function AdminEventsPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  const load = async () => {
+  const load = async (page = eventPage) => {
+    setLoading(true);
     try {
       const currentUser = await api.getMe();
       if (currentUser.role !== "admin" && currentUser.role !== "organizer") {
@@ -59,7 +58,12 @@ export default function AdminEventsPage() {
         return;
       }
       setUser(currentUser);
-      setEvents(await api.getEvents());
+      const payload = await api.getEvents(`?page=${page}`);
+      setEvents(payload.results);
+      setEventCount(payload.count);
+      setHasPreviousPage(Boolean(payload.previous));
+      setHasNextPage(Boolean(payload.next));
+      setError("");
     } catch {
       router.push("/signin?next=/admin/events");
     } finally {
@@ -72,8 +76,8 @@ export default function AdminEventsPage() {
       router.push("/signin?next=/admin/events");
       return;
     }
-    load();
-  }, [router]);
+    load(eventPage);
+  }, [router, eventPage]);
 
   const updateField = (key: string, value: string | boolean | File | null) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -117,17 +121,11 @@ export default function AdminEventsPage() {
     if (form.image) data.append("image", form.image);
 
     try {
-      const savedEvent = editing
-        ? await api.updateEvent(editing, data)
-        : await api.createEvent(data);
-      setEvents((current) =>
-        sortEvents(
-          editing
-            ? current.map((item) => (item.id === savedEvent.id ? savedEvent : item))
-            : [...current, savedEvent],
-        ),
-      );
+      if (editing) await api.updateEvent(editing, data);
+      else await api.createEvent(data);
       reset();
+      if (eventPage === 1) await load(1);
+      else setEventPage(1);
       setMessage(editing ? "Event updated." : "Event created.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save event.");
@@ -142,7 +140,9 @@ export default function AdminEventsPage() {
     setMessage("");
     try {
       await api.deleteEvent(id);
-      setEvents((current) => current.filter((event) => event.id !== id));
+      const nextPage = events.length === 1 && eventPage > 1 ? eventPage - 1 : eventPage;
+      if (nextPage === eventPage) await load(nextPage);
+      else setEventPage(nextPage);
       setMessage("Event deleted.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not delete event.");
@@ -169,7 +169,7 @@ export default function AdminEventsPage() {
         </div>
         <div className="rounded-2xl bg-ink px-5 py-4 text-white">
           <p className="text-xs text-white/50">Live listings</p>
-          <p className="mt-1 font-display text-3xl font-bold">{events.length}</p>
+          <p className="mt-1 font-display text-3xl font-bold">{eventCount}</p>
         </div>
       </div>
 
@@ -378,6 +378,13 @@ export default function AdminEventsPage() {
             </article>
           ))}
         </div>
+        {eventCount > 0 && (
+          <div className="mt-6 flex items-center justify-center gap-4">
+            <button type="button" className="button-secondary" disabled={!hasPreviousPage} onClick={() => setEventPage((current) => current - 1)}>Previous</button>
+            <span className="text-sm font-semibold text-ink/55">Page {eventPage}</span>
+            <button type="button" className="button-secondary" disabled={!hasNextPage} onClick={() => setEventPage((current) => current + 1)}>Next</button>
+          </div>
+        )}
       </div>
     </section>
   );

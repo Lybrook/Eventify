@@ -100,7 +100,8 @@ export function listFrom<T>(payload: T[] | Paginated<T>): T[] {
 }
 
 export const api = {
-  getEvents: (query = "") => apiFetchAll<EventItem>(`/events/${query}`),
+  getEvents: (query = "") => apiFetch<Paginated<EventItem>>(`/events/${query}`),
+  getEventLocations: () => apiFetch<string[]>("/events/locations/"),
   getEvent: (id: number) => apiFetch<EventItem>(`/events/${id}/`),
   createEvent: (data: FormData | Record<string, unknown>) =>
     apiFetch<EventItem>("/events/", { method: "POST", body: data instanceof FormData ? data : JSON.stringify(data) }),
@@ -108,6 +109,7 @@ export const api = {
     apiFetch<EventItem>(`/events/${id}/`, { method: "PATCH", body: data instanceof FormData ? data : JSON.stringify(data) }),
   deleteEvent: (id: number) => apiFetch<void>(`/events/${id}/`, { method: "DELETE" }),
   getTickets: () => apiFetchAll<Ticket>("/tickets/"),
+  getPendingTickets: () => apiFetchAll<Ticket>("/tickets/?pending=true"),
   bookTicket: (eventId: number) => apiFetch<Ticket>("/tickets/", { method: "POST", body: JSON.stringify({ event_id: eventId }) }),
   cancelTicket: (id: number) => apiFetch<void>(`/tickets/${id}/`, { method: "DELETE" }),
   initiatePayment: (ticketId: number, phoneNumber: string) =>
@@ -116,6 +118,7 @@ export const api = {
       body: JSON.stringify({ ticket_id: ticketId, phone_number: phoneNumber }),
     }),
   getPayments: () => apiFetchAll<Payment>("/payments/"),
+  getPendingPayments: () => apiFetchAll<Payment>("/payments/?pending=true"),
   getMe: () => apiFetch<User>("/auth/me/"),
   updateMe: (data: Pick<User, "name" | "email">) => apiFetch<User>("/auth/me/", { method: "PATCH", body: JSON.stringify(data) }),
   deleteMe: (password: string) => apiFetch<void>("/auth/me/", { method: "DELETE", body: JSON.stringify({ password }) }),

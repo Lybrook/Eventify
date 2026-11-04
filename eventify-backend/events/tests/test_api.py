@@ -259,6 +259,89 @@ class EventifyApiTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+    def test_event_list_filters_search_category_location_and_date_on_the_server(self):
+        matching_event = Event.objects.create(
+            title="Coastal Gathering",
+            description="A quiet community festival",
+            date="2026-11-12",
+            location="Old Town, Mombasa",
+            category="Community",
+            ticket_price="500.00",
+        )
+        Event.objects.create(
+            title="City Concert",
+            description="Live music",
+            date="2026-11-13",
+            location="Nairobi",
+            category="Music",
+            ticket_price="1500.00",
+        )
+
+        response = self.client.get(
+            reverse("event-list"),
+            {
+                "search": "community",
+                "category": "community",
+                "location": "Mombasa",
+                "date": "2026-11-12",
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["id"], matching_event.id)
+
+    def test_event_locations_returns_distinct_sorted_values(self):
+        Event.objects.create(
+            title="Second Nairobi Event",
+            date="2026-11-13",
+            location="Nairobi",
+            category="Music",
+            ticket_price="1500.00",
+        )
+
+        response = self.client.get(reverse("event-locations"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, ["Nairobi"])
+
+    def test_pending_ticket_and_payment_lists_are_filtered_and_user_scoped(self):
+        pending_ticket = Ticket.objects.create(
+            event=self.event,
+            user=self.user,
+            status=Ticket.Status.CONFIRMED,
+        )
+        Ticket.objects.create(event=self.event, user=self.user, status=Ticket.Status.PAID)
+        other_user = User.objects.create_user(
+            email="another-user@example.com",
+            password="another-user-password",
+            name="Another User",
+        )
+        Ticket.objects.create(event=self.event, user=other_user, status=Ticket.Status.CONFIRMED)
+        pending_payment = Payment.objects.create(
+            ticket=pending_ticket,
+            user=self.user,
+            amount="1000.00",
+            phone_number="254712345678",
+            status=Payment.Status.INITIATED,
+        )
+        Payment.objects.create(
+            ticket=pending_ticket,
+            user=self.user,
+            amount="1000.00",
+            phone_number="254712345678",
+            status=Payment.Status.COMPLETED,
+        )
+
+        self.authenticate("user@example.com", "user-password")
+        tickets_response = self.client.get(reverse("ticket-list"), {"pending": "true"})
+        payments_response = self.client.get(reverse("payment-list"), {"pending": "true"})
+
+        self.assertEqual(tickets_response.status_code, status.HTTP_200_OK)
+        self.assertEqual([item["id"] for item in tickets_response.data["results"]], [pending_ticket.id])
+        self.assertEqual(payments_response.status_code, status.HTTP_200_OK)
+        self.assertEqual([item["id"] for item in payments_response.data["results"]], [pending_payment.id])
+
     def test_event_rejects_fractional_kenyan_shilling_prices(self):
         self.authenticate("admin@example.com", "admin-password")
 
